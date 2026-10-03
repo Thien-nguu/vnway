@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sếp Tới Kìa! - Office Slacker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1e1e2e;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      user-select: none;
+    }
+    h1 { margin-bottom: 10px; color: #f9e2af; text-shadow: 2px 2px #000; }
+    p.instructions { margin-bottom: 15px; color: #bac2de; font-size: 14px; text-align: center; }
+    #game-container {
+      position: relative;
+      border: 4px solid #cba6f7;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    canvas { display: block; background: #313244; cursor: pointer; }
+    .btn-restart {
+      margin-top: 15px;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #a6e3a1;
+      color: #11111b;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: none;
+      transition: transform 0.1s, background 0.2s;
+    }
+    .btn-restart:hover { background: #94e2d5; transform: scale(1.05); }
+  </style>
+</head>
+<body>
+
+  <h1>SẾP TỚI KÌA! 🤫</h1>
+  <p class="instructions">Giữ **Chuột / Space / Cảm ứng** để ăn vụng. Nhả ra để giả vờ làm việc khi Sếp dòm!</p>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+  </div>
+  
+  <button id="restartBtn" class="btn-restart" onclick="resetGame()">Chơi Lại 🔄</button>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const restartBtn = document.getElementById('restartBtn');
+
+    // Trạng thái Game
+    let score = 0;
+    let isSlackinig = false; // Đang ăn vụng hay làm việc
+    let gameOver = false;
+    let gameWon = false;
+
+    // Trạng thái Sếp (0: Đi vắng, 1: Cảnh báo "!", 2: Xuất hiện dòm)
+    let bossState = 0; 
+    let bossTimer = 0;
+    let warningTime = 90; // Thời gian hiện dấu "!" trước khi nhìn (khung hình)
+
+    // Lắng nghe sự kiện (Chuột, Phím, Cảm ứng mobile)
+    function startSlack() { if (!gameOver && !gameWon) isSlackinig = true; }
+    function stopSlack() { isSlackinig = false; }
+
+    window.addEventListener('mousedown', startSlack);
+    window.addEventListener('mouseup', stopSlack);
+    window.addEventListener('touchstart', (e) => { e.preventDefault(); startSlack(); });
+    window.addEventListener('touchend', stopSlack);
+    
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') startSlack(); });
+    window.addEventListener('keyup', (e) => { if (e.code === 'Space') stopSlack(); });
+
+    // Khởi tạo / Reset Game
+    function resetGame() {
+      score = 0;
+      isSlackinig = false;
+      gameOver = false;
+      gameWon = false;
+      bossState = 0;
+      bossTimer = Math.floor(Math.random() * 120) + 100;
+      restartBtn.style.display = 'none';
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Logic cập nhật trạng thái
+    function update() {
+      if (gameOver || gameWon) return;
+
+      // Tích điểm khi ăn vụng
+      if (isSlackinig) {
+        score += 0.15;
+        if (score >= 100) {
+          score = 100;
+          gameWon = true;
+          restartBtn.style.display = 'block';
+        }
+      }
+
+      // Quản lý hành vi của Sếp
+      bossTimer--;
+      if (bossTimer <= 0) {
+        if (bossState === 0) {
+          // Bắt đầu cảnh báo
+          bossState = 1;
+          bossTimer = warningTime;
+        } else if (bossState === 1) {
+          // Sếp quay sang dòm!
+          bossState = 2;
+          bossTimer = Math.floor(Math.random() * 80) + 60; // Thời gian dòm
+        } else if (bossState === 2) {
+          // Sếp đi chỗ khác
+          bossState = 0;
+          bossTimer = Math.floor(Math.random() * 150) + 100;
+        }
+      }
+
+      // Kiểm tra thua cuộc: Sếp đang dòm (bossState === 2) mà vẫn đang ăn vụng
+      if (bossState === 2 && isSlackinig) {
+        gameOver = true;
+        restartBtn.style.display = 'block';
+      }
+    }
+
+    // Vẽ Game
+    function draw() {
+      // Xóa màn hình
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Vẽ Văn Phòng (Phông nền)
+      ctx.fillStyle = '#45475a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Bàn làm việc
+      ctx.fillStyle = '#89b4fa';
+      ctx.fillRect(100, 280, 400, 120);
+
+      // Cửa sổ / Cửa ra vào phía sau (Nơi Sếp xuất hiện)
+      ctx.fillStyle = '#181825';
+      ctx.fillRect(450, 50, 100, 200);
+
+      // 2. Vẽ Sếp
+      if (bossState === 1) {
+        // Dấu cảnh báo "!"
+        ctx.fillStyle = '#f38ba8';
+        ctx.font = 'bold 48px sans-serif';
+        ctx.fillText('⚠️ !', 480, 40);
+      } else if (bossState === 2) {
+        // Sếp ngó đầu ra từ cửa
+        ctx.fillStyle = '#f38ba8'; // Đầu sếp
+        ctx.beginPath();
+        ctx.arc(480, 120, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Mắt sếp hình viên đạn
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(470, 115, 8, 0, Math.PI * 2);
+        ctx.arc(490, 115, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(468, 115, 3, 0, Math.PI * 2);
+        ctx.arc(488, 115, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. Vẽ Nhân Viên (Người chơi)
+      // Thân
+      ctx.fillStyle = '#a6e3a1';
+      ctx.fillRect(230, 220, 60, 80);
+
+      // Đầu
+      ctx.fillStyle = '#f9e2af';
+      ctx.beginPath();
+      ctx.arc(260, 190, 30, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Biểu cảm khuôn mặt & Hành động
+      if (isSlackinig) {
+        // Mặt đang ăn vụng (Mắt nhắm khoái chí, miệng bơ-gơ)
+        ctx.fillStyle = '#11111b';
+        ctx.font = '20px sans-serif';
+        ctx.fillText('😋', 248, 197);
+
+        // Miếng bánh đùi gà trên tay
+        ctx.font = '30px sans-serif';
+        ctx.fillText('🍗', 280, 240);
+      } else {
+        // Mặt làm việc nghiêm túc
+        ctx.fillStyle = '#11111b';
+        ctx.font = '20px sans-serif';
+        ctx.fillText('🤓', 248, 197);
+
+        // Máy tính trên bàn
+        ctx.fillStyle = '#b4befe';
+        ctx.fillRect(280, 230, 15, 40); // Màn hình nghiêng
+        ctx.fillStyle = '#cdd6f4';
+        ctx.fillRect(270, 270, 40, 10); // Bàn phím
+      }
+
+      // 4. Thanh Tiến Độ (Thanh Lười Biếng)
+      ctx.fillStyle = '#313244';
+      ctx.fillRect(50, 20, 300, 25);
+      ctx.fillStyle = '#fab387';
+      ctx.fillRect(50, 20, (score / 100) * 300, 25);
+      ctx.strokeStyle = '#fff';
+      ctx.strokeRect(50, 20, 300, 25);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`Mức độ xả stress: ${Math.floor(score)}%`, 60, 38);
+
+      // 5. Thông báo Thắng / Thua
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#f38ba8';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('BỊ SẾP BẮT QUẢ TANG! 😱', canvas.width / 2, 180);
+        
+        ctx.fillStyle = '#cdd6f4';
+        ctx.font = '18px sans-serif';
+        ctx.fillText('Bạn đã bị trừ hết lương tháng này!', canvas.width / 2, 220);
+        ctx.textAlign = 'left';
+      } else if (gameWon) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#a6e3a1';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('TAN GIỜ LÀM RỒI! 🎉', canvas.width / 2, 180);
+        
+        ctx.fillStyle = '#cdd6f4';
+        ctx.font = '18px sans-serif';
+        ctx.fillText('Bạn đã quậy tưng bừng mà Sếp không hề hay biết!', canvas.width / 2, 220);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // Vòng lặp Game
+    function gameLoop() {
+      update();
+      draw();
+      if (!gameOver && !gameWon) {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // Chạy game
+    resetGame();
+  </script>
+</body>
+</html>
